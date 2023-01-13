@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "yalafi-ls"
+version = "0.0.1"
+authors = [{"name" = "torik42"}]
+description = "Yet another LaTeX filter"
+classifiers = []
+dependencies = [
+    "yalafi",
+    "pygls ~= 1.0",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/torik42/YaLafi-LS"
+"Changelog" = "https://github.com/torik42/YaLafi-LS/blob/master/HISTORY.md"
+"Documentation" = "https://github.com/torik42/YaLafi-LS"
+"Issue Tracker" = "https://github.com/torik42/YaLafi-LS/issues"
+
+[tool.setuptools.packages.find]
+include = ["yalafi_ls*"]
+
+[tool.pylint.main]
+disable = [
+    "unused-argument",
+]
