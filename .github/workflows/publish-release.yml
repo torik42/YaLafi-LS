@@ -1,0 +1,31 @@
+# Copied from https://github.com/torik42/YaLafi/blob/c84a117fdbc9095d26e72579069ae662543efa44/.github/workflows/publish-release.yml
+# and modified where needed.
+
+name: Publish to PyPI
+
+on:
+  release:
+    types: [released]
+
+jobs:
+  publish-to-pypi:
+    name: Publish Package to PyPI
+    env:
+      version: ${{ github.ref_name }}
+    runs-on: ubuntu-latest
+
+    steps:
+    - run: >
+        echo "Publishing version $version"
+    - name: Download Release Assets
+      uses: dsaltares/fetch-gh-release-asset@3942ce82f1192754cd487a86f03eef6eeb89b5da
+      with:
+        version: tags/${{ env.version }}
+        regex: true
+        file: yalafi-ls-${{ env.version }}.*
+        target: assets/
+    - name: Publish distribution to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        password: ${{ secrets.PYPI_API_TOKEN }}
+        packages_dir: assets/
