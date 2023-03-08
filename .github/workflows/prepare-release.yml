@@ -6,10 +6,10 @@ name: Build and prepare release
 on:
   push:
     tags:
-    - '[1-9]+.[0-9]+.[0-9]+'
-    - '[1-9]+.[0-9]+.[0-9]+a[0-9]+'
-    - '[1-9]+.[0-9]+.[0-9]+b[0-9]+'
-    - '[1-9]+.[0-9]+.[0-9]+rc[0-9]+'
+    - '[0-9]+.[0-9]+.[0-9]+'
+    - '[0-9]+.[0-9]+.[0-9]+a[0-9]+'
+    - '[0-9]+.[0-9]+.[0-9]+b[0-9]+'
+    - '[0-9]+.[0-9]+.[0-9]+rc[0-9]+'
 
 jobs:
   build-n-publish:
@@ -50,10 +50,10 @@ jobs:
       uses: ncipollo/release-action@v1
       with:
         allowUpdates: true
-        artifacts: 'dist/yalafi-ls*.whl,dist/yalafi-ls*.tar.gz'
+        artifacts: 'dist/yalafi_ls*.whl,dist/yalafi-ls*.tar.gz'
         draft: true
         name: Version ${{ env.version }}
-        body: "<!---\nUpdate and test the Link to the correct section!\nAdd release info if necessary.\n--->\nFor a complete changelog see [HISTORY.md](https://github.com/torik42/YaLafi-LS/blob/master/HISTORY.md)."
+        body: "<!---\nUpdate and test the Link to the correct section!\nAdd release info if necessary.\n--->\nFor a complete changelog see [HISTORY.md](https://github.com/torik42/YaLafi-LS/blob/main/HISTORY.md)."
         prerelease: false
         token: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
     - name: Publish distribution to Test PyPI
@@ -63,12 +63,12 @@ jobs:
         repository_url: https://test.pypi.org/legacy/
 
   sleep:
-    name: Wait two minutes for PyPI to be available
+    name: Wait five minutes for PyPI to be available
     needs: build-n-publish
     runs-on: ubuntu-latest
     steps:
-      - name: Wait two minutes for PyPI to be available
-        run: sleep 120
+      - name: Wait five minutes for PyPI to be available
+        run: sleep 300
 
   testPyPI-install:
     name: Test PyPI package
@@ -82,12 +82,12 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install pytest
-        run: python -m pip install pytest
+      # - name: Install pytest
+      #   run: python -m pip install pytest
       - name: Test install from test.PyPI
         run: |
           version_gittag=${{github.ref_name}}
-          pip install -i https://test.pypi.org/simple/yalafi-ls==${version_gittag}
+          pip install install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ yalafi-ls==${version_gittag}
       - name: Test import of packages
         run: |
           python -c "import yalafi_ls"

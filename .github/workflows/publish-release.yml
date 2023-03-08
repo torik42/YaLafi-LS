@@ -22,7 +22,7 @@ jobs:
       with:
         version: tags/${{ env.version }}
         regex: true
-        file: yalafi-ls-${{ env.version }}.*
+        file: yalafi(-|_)ls-${{ env.version }}.*
         target: assets/
     - name: Publish distribution to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
