@@ -204,7 +204,7 @@ def full_spellcheck(ls, text_document_uri):
 
 
 def _create_diagnostic_from_match(match, text_doc):
-    offset = json_get(match, 'offset', int) -1
+    offset = json_get(match, 'offset', int)
     length = json_get(match, 'length', int)
     lt_message = json_get(match, 'message', str)
     lt_short_message = json_get(match, 'shortMessage', str)
@@ -255,7 +255,7 @@ def _mark_context(context: dict):
 
 def _position_from_offset(tex, lines, offset):
     lin = tex.count('\n', 0, offset)
-    col = offset - tex.rfind('\n', 0, offset)
+    col = offset - tex.rfind('\n', 0, offset) - 1
     position = Position(line=lin, character=col)
     return position
 
