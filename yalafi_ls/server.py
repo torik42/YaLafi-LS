@@ -73,39 +73,11 @@ def range_in(a: Range, b: Range):  # pylint: disable=invalid-name
         return False
 Range.__contains__ = range_in
 
-# The following mapping table is based on
-#    https://github.com/mfbehrens99/linter-yalafi/blob/e69af00/lib/linter-yalafi.js
-# All errors were changed to warnings.
-# Original work licensed under the MIT license.
-# See NOTICE in the project root for license information
-LT_SEVERITY_MAPPING = {
-    'CASING': DiagnosticSeverity.Warning,  # was error
-    'COLLOCATIONS': DiagnosticSeverity.Warning,  # was error
-    'COLLOQUIALISMS': DiagnosticSeverity.Information,
-    'COMPOUNDING': DiagnosticSeverity.Warning,  # was error
-    'CONFUSED_WORDS': DiagnosticSeverity.Information,
-    'CORRESPONDENCE': DiagnosticSeverity.Warning,  # was error
-    'EINHEIT_LEERZEICHEN': DiagnosticSeverity.Warning,
-    'EMPFOHLENE_RECHTSCHREIBUNG': DiagnosticSeverity.Information,
-    'FALSE_FRIENDS': DiagnosticSeverity.Information,
-    'GENDER_NEUTRALITY': DiagnosticSeverity.Information,
-    'GRAMMAR': DiagnosticSeverity.Warning,  # was error
-    'HILFESTELLUNG_KOMMASETZUNG': DiagnosticSeverity.Warning,
-    'IDIOMS': DiagnosticSeverity.Information,
-    'MISC': DiagnosticSeverity.Warning,
-    'MISUSED_TERMS_EU_PUBLICATIONS': DiagnosticSeverity.Warning,
-    'NONSTANDARD_PHRASES': DiagnosticSeverity.Information,
-    'PLAIN_ENGLISH': DiagnosticSeverity.Information,
-    'PROPER_NOUNS': DiagnosticSeverity.Warning,  # was error
-    'PUNCTUATION': DiagnosticSeverity.Warning,  # was error
-    'REDUNDANCY': DiagnosticSeverity.Warning,  # was error
-    'REGIONALISMS': DiagnosticSeverity.Information,
-    'REPETITIONS': DiagnosticSeverity.Information,
-    'SEMANTICS': DiagnosticSeverity.Warning,
-    'STYLE': DiagnosticSeverity.Information,
-    'TYPOGRAPHY': DiagnosticSeverity.Warning,
-    'TYPOS': DiagnosticSeverity.Warning,  # was error
-    'WIKIPEDIA': DiagnosticSeverity.Information,
+
+LT_TYPE_SEVERITY_MAPPING = {
+    'UnknownWord': DiagnosticSeverity.Warning,
+    'Other': DiagnosticSeverity.Information,
+    'Hint': DiagnosticSeverity.Hint,
 }
 
 PLAIN_TEXT = 'plain_text'
@@ -232,13 +204,21 @@ def _create_diagnostic_from_match(match, text_doc):
     lt_message = json_get(match, 'message', str)
     lt_short_message = json_get(match, 'shortMessage', str)
     lt_rule = json_get(match, 'rule', dict)
+    lt_type_name = 'Other'
+    # `lt_type_name` is used for severity mapping. If it is not present
+    # in the `match` information, we just use `Other`.
+    try:
+        lt_type_name = json_get(json_get(match, 'type', dict), 'typeName', str)
+    except TypeError:
+        pass
     lt_replacements = json_get(match, 'replacements', list)
     plain_text, context = _mark_context(json_get(match, 'context', dict))
     message = f"{lt_short_message}\n{lt_message}\nContext: {context}"
-    if lt_rule['category']['id'] in LT_SEVERITY_MAPPING.keys():
-        severity = LT_SEVERITY_MAPPING[lt_rule['category']['id']]
-    else:
-        severity = DiagnosticSeverity.Error
+    severity = LT_TYPE_SEVERITY_MAPPING.get(
+        lt_type_name,
+        DiagnosticSeverity.Information
+    )
+
     return Diagnostic(
         range=Range(
             start=_position_from_offset(text_doc.source,
