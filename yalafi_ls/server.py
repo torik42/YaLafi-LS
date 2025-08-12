@@ -34,9 +34,11 @@ from lsprotocol.types import (
     TEXT_DOCUMENT_DID_CHANGE,
     TEXT_DOCUMENT_DID_CLOSE,
     TEXT_DOCUMENT_DID_SAVE,
+    WINDOW_WORK_DONE_PROGRESS_CANCEL,
 )
 from lsprotocol.types import (
     CodeAction,
+    CodeActionContext,
     CodeActionKind,
     CodeActionOptions,
     CodeActionParams,
@@ -57,6 +59,7 @@ from lsprotocol.types import (
     WorkDoneProgressBegin,
     WorkDoneProgressEnd,
     WorkDoneProgressReport,
+    WorkDoneProgressCancelParams,
     WorkspaceConfigurationParams,
     WorkspaceEdit,
 )
@@ -125,7 +128,7 @@ def json_get(dic, item, typ):
         raise TypeError(f"Expect the parsed item to be of type {typ}.")
     return ret
 
-def full_spellcheck(ls, text_document_uri):
+def full_spellcheck(ls: LanguageServer, text_document_uri):
     """
     Run YaLafi and populate diagnostics.
 
@@ -140,23 +143,42 @@ def full_spellcheck(ls, text_document_uri):
         token = str(uuid.uuid4())
         ls.progress.create(token)
         ls.progress.begin(token,
-            WorkDoneProgressBegin(title='Spellchecking', message='Run YaLafi')
+            WorkDoneProgressBegin(
+                title='Spellchecking',
+                message='Run YaLafi',
+                cancellable=True
+            )
         )
         success = False
         try:
-            result = subprocess.run(
+            process = subprocess.Popen(
                 [sys.executable] +
                 ['-m', 'yalafi.shell', '--out', 'json'] +
                 ls.yalafi_options +
                 [text_doc.path],
-                cwd=Path(text_doc.path).parent, capture_output=True,
-                encoding='UTF-8', check=True
-                )
-            ls.progress.report(token,
-                WorkDoneProgressReport(message='Parse result'),
+                cwd=Path(text_doc.path).parent,
+                encoding='UTF-8',
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
             )
-            dic = json_decoder.decode(result.stdout)
-            success = True
+            ls.subprocesses[token] = process
+            stdout, stderr = process.communicate()
+            ls.show_message_log(
+                f"[Info] YaLafi subprocess returned with code {process.returncode}"
+            )
+            if process.returncode != 0:
+                if ls.subprocesses[token] == "Cancelled":
+                    ls.progress.end(token, WorkDoneProgressEnd(message='Cancelled'))
+                else:
+                    raise subprocess.CalledProcessError(
+                        process.returncode, process.args, stderr
+                    )
+            else:
+                ls.progress.report(token,
+                    WorkDoneProgressReport(message='Parse result'),
+                )
+                dic = json_decoder.decode(stdout)
+                success = True
         except subprocess.CalledProcessError as exception:
             ls.show_message_log(
                 "[Error] Could not run Yalafi. " +
@@ -181,7 +203,7 @@ def full_spellcheck(ls, text_document_uri):
             ls.show_message_log('[Error] YaLafi did not returned valid JSON.')
             ls.show_message_log(
                 "[Error] YaLafi Stderr:\n    " +
-                "\n    ".join(str(result.stderr).split('\n'))
+                "\n    ".join(str(stderr).split('\n'))
             )
         finally:
             if not success:
@@ -201,6 +223,7 @@ def full_spellcheck(ls, text_document_uri):
             text_doc.diagnostics = diagnostics
             ls.publish_diagnostics(text_doc.uri, text_doc.diagnostics)
             ls.progress.end(token, WorkDoneProgressEnd(message='Finished'))
+        del ls.subprocesses[token]
 
 
 def _create_diagnostic_from_match(match, text_doc):
@@ -295,9 +318,15 @@ class YaLafiLanguageServer(LanguageServer):
     CONFIGURATION_SECTION = 'yalafi'
     SOURCE_NAME = 'YaLafi'
 
+    default_error_message = "Unexpected error in YaLafi LSP server, see server's logs for details."
+
     def __init__(self,**kwargs):
         super().__init__(**kwargs)
         self.yalafi_options = []
+        self.subprocesses = {}
+        """Dictionary of subprocesses for spellchecking. The keys are
+        the tokens of the progress reports."""
+
 
 
 SERVER = YaLafiLanguageServer(name="yalafi-language-server",
@@ -421,3 +450,14 @@ def did_close(ls: YaLafiLanguageServer, params: DidCloseTextDocumentParams):
     """Delete Diagnostics after closing the document."""
     text_doc = ls.workspace.get_document(params.text_document.uri)
     ls.publish_diagnostics(text_doc.uri, [])
+
+
+@SERVER.thread()
+@SERVER.feature(WINDOW_WORK_DONE_PROGRESS_CANCEL)
+def progress_cancel(ls: YaLafiLanguageServer, params: WorkDoneProgressCancelParams):
+    """Delete Diagnostics after closing the document."""
+    token = params.token
+    if token in ls.subprocesses:
+        ls.show_message_log('[Info] Will cancel progress with token ' + str(params.token))
+        ls.subprocesses[token].terminate()
+        ls.subprocesses[token] = "Cancelled"
