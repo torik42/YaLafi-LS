@@ -327,10 +327,30 @@ class YaLafiLanguageServer(LanguageServer):
         """Dictionary of subprocesses for spellchecking. The keys are
         the tokens of the progress reports."""
 
+from pygls.protocol import default_converter
+from cattrs.errors import ClassValidationError
+
+def loose_converter_factory():
+    converter = default_converter()
+
+    def relaxed_code_action_context_hook(obj, type_):
+        diagnostics = []
+        for diag in obj['diagnostics']:
+            try:
+                diagnostics.append(converter.structure(diag, Diagnostic))
+            except ClassValidationError:
+                pass
+
+        return CodeActionContext(diagnostics=diagnostics)
+
+    converter.register_structure_hook(CodeActionContext, relaxed_code_action_context_hook)
+
+    return converter
 
 
 SERVER = YaLafiLanguageServer(name="yalafi-language-server",
-                              version="0.0.1")
+                              version="0.0.1",
+                              converter_factory=loose_converter_factory)
 
 
 def fetch_configuration(ls):
